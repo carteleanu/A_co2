@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
@@ -92,32 +91,27 @@ int main()
             int32_t len = recvfrom(COMMAND_SOCKET, rxbuf, sizeof(rxbuf)-1, remote_ip, &remote_port);
             if (len > 0)
             {
+                // Ensure null-termination for string handling
                 rxbuf[len] = 0;
+
                 printf(" CMD from %d.%d.%d.%d:%d → %s\n",
                        remote_ip[0], remote_ip[1], remote_ip[2], remote_ip[3],
                        remote_port, rxbuf);
+                
+                if (len < sizeof(rxbuf) - 1) { // Check if there's room for '\n' before the null terminator
+                    rxbuf[len] = '\n';    // Replace the null terminator with a newline
+                    rxbuf[len + 1] = 0;   // Put the null terminator after the newline
+                    len += 1;             // Update the effective length
+                } else {
+                    // If buffer is full, we still send but without appending '\n' easily.
+                    // For simplicity, we assume the commands are short enough.
+                }
 
-                // Parse expected format: x@yyy
-int channel = 0, value = 0;
-if (sscanf((char*)rxbuf, "%d@%d", &channel, &value) == 2) {
-
-    // Clamp to valid ranges
-    if (channel < 1) channel = 1;
-    if (channel > 12) channel = 12;
-    if (value < 0) value = 0;
-    if (value > 255) value = 255;
-
-    // Format into "channel value\n"
-    char uart_msg[32];
-    snprintf(uart_msg, sizeof(uart_msg), "%d %d\n", channel, value);
-
-    uart_puts(UART_ID, uart_msg);
-    printf(" Forwarded to Teensy: %s", uart_msg);
-}
-else {
-    printf(" Invalid format (expected x@yyy): %s\n", rxbuf);
-}
-
+                // Send the entire string, including the appended '\n', over UART
+                uart_puts(UART_ID, (const char*)rxbuf);
+                
+                printf(" Forwarded to Teensy: %s", rxbuf); // rxbuf already includes the newline now
+          
             }
         }
     }
